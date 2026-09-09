@@ -6,7 +6,7 @@ import xss from "xss-clean";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import express, { Application } from "express";
+import express, { Application, RequestHandler } from "express";
 import mongoSanitize from "express-mongo-sanitize";
 import { AppError } from "./middlewares/handleAppError.middleware";
 import { globalErrorHandler } from "./controllers/handleAppError.controller";
@@ -42,10 +42,10 @@ app.use("/api", limiter);
 
 app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser());
-app.use(mongoSanitize());
-app.use(xss());
-app.use(hpp());
-app.use(compression());
+app.use(mongoSanitize() as RequestHandler);
+app.use(xss() as RequestHandler);
+app.use(hpp() as RequestHandler);
+app.use(compression() as RequestHandler);
 
 app.get("/", (_req, res) =>
   res.status(200).json({ message: "Welcome to Sweet Feet API", version: "1.0" })
@@ -62,6 +62,6 @@ app.all("*", (req, _res, next) =>
   next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404))
 );
 
-app.use(globalErrorHandler);
+app.use(globalErrorHandler as unknown as RequestHandler);
 
 export default app;
