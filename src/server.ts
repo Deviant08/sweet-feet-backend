@@ -12,10 +12,11 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
-const port = process.env.PORT || 5000;
+const port = Number(process.env.PORT) || 5000;
+const host = process.env.HOST || "0.0.0.0";
 const isProd = process.env.NODE_ENV === "production";
 
-/** Keep only scheme + user + host + db name. Query flags often arrive empty from Render/Atlas copy-paste. */
+/** Keep scheme + user + host + db name. Empty query flags from copy-paste break SRV. */
 function sanitizeMongoUri(raw: string): string {
   let uri = raw.trim().replace(/^['"]|['"]$/g, "");
   const q = uri.indexOf("?");
@@ -36,7 +37,9 @@ const dbConnect = async () => {
     throw new Error("DATABASE_HOSTED is not set. Add a MongoDB Atlas URI in the Render environment.");
   }
   if (uri.includes("<db_password>") || uri.includes("<password>")) {
-    throw new Error("DATABASE_HOSTED still contains <db_password>. Replace that placeholder with the real Atlas user password.");
+    throw new Error(
+      "DATABASE_HOSTED still contains <db_password>. Replace that placeholder with the real Atlas user password."
+    );
   }
   if (isProd && looksLocal) {
     throw new Error("DATABASE_HOSTED points at localhost. Use a MongoDB Atlas mongodb+srv URI.");
@@ -44,17 +47,33 @@ const dbConnect = async () => {
   if (!uri.startsWith("mongodb")) {
     throw new Error("DATABASE_HOSTED must start with mongodb+srv:// or mongodb://");
   }
+
   console.log("Connecting to", redact(uri));
-  await mongoose.connect(uri);
+
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
+  });
+
   console.log("************ DATABASE CONNECTED ************");
 };
 
 const start = async () => {
-  await dbConnect();
+  try {
+    await dbConnect();
+  } catch (err: any) {
+    console.error("MongoDB connection failed:", err?.name, err?.message);
+    console.error(
+      "Fix: Atlas → Network Access → Allow Access from Anywhere (0.0.0.0/0). Check username/password in DATABASE_HOSTED."
+    );
+    process.exit(1);
+  }
+
   const server = http.createServer(app);
   attachChatSocket(server);
-  server.listen(port, () => {
-    console.log(`Sweet Feet API listening on port ${port}`);
+
+  server.listen(port, host, () => {
+    console.log(`Sweet Feet API listening on http://${host}:${port}`);
     console.log("Chat WebSocket on /ws/chat");
   });
 
