@@ -19,6 +19,7 @@ import messageRouter from "./routes/message.route";
 import feedbackRouter from "./routes/feedback.route";
 
 const app: Application = express();
+const use = (mw: unknown) => app.use(mw as RequestHandler);
 
 const origins = (process.env.CORS_ORIGINS || "http://localhost:3000").split(",").map((s) => s.trim());
 
@@ -30,8 +31,8 @@ app.use(
 );
 app.options("*", cors());
 
-app.use(helmet());
-app.use(morgan("dev"));
+use(helmet());
+use(morgan("dev"));
 
 const limiter = rateLimit({
   max: 200,
@@ -41,11 +42,11 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 
 app.use(express.json({ limit: "10kb" }));
-app.use(cookieParser());
-app.use(mongoSanitize() as RequestHandler);
-app.use(xss() as RequestHandler);
-app.use(hpp() as RequestHandler);
-app.use(compression() as RequestHandler);
+use(cookieParser());
+use(mongoSanitize());
+use(xss());
+use(hpp());
+use(compression());
 
 app.get("/", (_req, res) =>
   res.status(200).json({ message: "Welcome to Sweet Feet API", version: "1.0" })
@@ -62,6 +63,6 @@ app.all("*", (req, _res, next) =>
   next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404))
 );
 
-app.use(globalErrorHandler as unknown as RequestHandler);
+use(globalErrorHandler);
 
 export default app;
