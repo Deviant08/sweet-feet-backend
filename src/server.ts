@@ -15,18 +15,13 @@ process.on("uncaughtException", (err) => {
 const port = process.env.PORT || 5000;
 const isProd = process.env.NODE_ENV === "production";
 
+/** Keep only scheme + user + host + db name. Query flags often arrive empty from Render/Atlas copy-paste. */
 function sanitizeMongoUri(raw: string): string {
   let uri = raw.trim().replace(/^['"]|['"]$/g, "");
   const q = uri.indexOf("?");
-  if (q === -1) return uri;
-  const base = uri.slice(0, q).replace(/\/$/, "");
-  const params = new URLSearchParams(uri.slice(q + 1));
-  const kept = new URLSearchParams();
-  params.forEach((value, key) => {
-    if (key && value !== undefined && value !== "") kept.set(key, value);
-  });
-  const qs = kept.toString();
-  return qs ? `${base}/?${qs}` : base;
+  if (q !== -1) uri = uri.slice(0, q);
+  uri = uri.replace(/\/+$/, "");
+  return uri;
 }
 
 function redact(uri: string): string {
@@ -44,9 +39,10 @@ const dbConnect = async () => {
     throw new Error("DATABASE_HOSTED still contains <db_password>. Replace that placeholder with the real Atlas user password.");
   }
   if (isProd && looksLocal) {
-    throw new Error(
-      "DATABASE_HOSTED points at localhost. On Render you must use a hosted URI (MongoDB Atlas), not 127.0.0.1."
-    );
+    throw new Error("DATABASE_HOSTED points at localhost. Use a MongoDB Atlas mongodb+srv URI.");
+  }
+  if (!uri.startsWith("mongodb")) {
+    throw new Error("DATABASE_HOSTED must start with mongodb+srv:// or mongodb://");
   }
   console.log("Connecting to", redact(uri));
   await mongoose.connect(uri);
@@ -59,7 +55,7 @@ const start = async () => {
   attachChatSocket(server);
   server.listen(port, () => {
     console.log(`Sweet Feet API listening on port ${port}`);
-    console.log(`Chat WebSocket on /ws/chat`);
+    console.log("Chat WebSocket on /ws/chat");
   });
 
   process.on("unhandledRejection", (err: any) => {
@@ -69,7 +65,6 @@ const start = async () => {
   });
 
   process.on("SIGTERM", () => {
-    console.log("SIGTERM RECEIVED SHUTTING DOWN");
     server.close(() => console.log("Process terminated"));
   });
 };
