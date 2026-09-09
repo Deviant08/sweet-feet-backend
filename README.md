@@ -11,6 +11,7 @@ Frontend repo: [Deviant08/Sweet-Feet](https://github.com/Deviant08/Sweet-Feet)
 - MongoDB (Mongoose)
 - JWT auth (customers & retailers)
 - Paystack payments
+- WebSocket chat at `/ws/chat`
 
 ## Setup (local)
 
@@ -25,6 +26,8 @@ npm run dev
 
 API base: **`http://localhost:5000/api/v1`**
 
+Chat socket: **`ws://localhost:5000/ws/chat?token=JWT`**
+
 Health check: `GET http://localhost:5000/` → `{ message: "Welcome to Sweet Feet API" }`
 
 ## Link to frontend
@@ -32,14 +35,32 @@ Health check: `GET http://localhost:5000/` → `{ message: "Welcome to Sweet Fee
 The frontend uses `js/api.js`:
 
 ```js
-// default for local
 API_BASE = "http://localhost:5000/api/v1"
-
-// production — set before modules load, or change the default:
 window.SF_API_BASE = "https://YOUR-BACKEND-HOST/api/v1"
+window.SF_WS_URL = "wss://YOUR-BACKEND-HOST/ws/chat"
 ```
 
 CORS is controlled by `CORS_ORIGINS` in `.env` (comma-separated, no trailing slash).
+
+## Chat protocol (`/ws/chat`)
+
+Connect with `?token=<JWT>` (or cookie `jwt`).
+
+Client → server:
+- `{ "type": "join", "partnerId": "<other party id>" }`
+- `{ "type": "message", "text": "hello", "partnerId": "...", "productId": "optional" }`
+- `{ "type": "typing", "on": true }`
+- `{ "type": "ping" }`
+
+Server → client:
+- `{ "type": "ready", "self": { "id", "role", "name" } }`
+- `{ "type": "joined", "room" }`
+- `{ "type": "message", "data": { ...saved Message } }`
+- `{ "type": "inbox", "partnerId", "last_message" }`
+- `{ "type": "typing", "on", "from" }`
+- `{ "type": "error", "message" }`
+
+REST `/api/v1/messages` is still used to load history.
 
 ## Main routes (`/api/v1`)
 
