@@ -13,8 +13,12 @@ process.on("uncaughtException", (err) => {
 });
 
 const port = Number(process.env.PORT) || 5000;
-const host = process.env.HOST || "0.0.0.0";
 const isProd = process.env.NODE_ENV === "production";
+// Render (and most hosts) need 0.0.0.0 — never bind 127.0.0.1 in production
+const host =
+  isProd || process.env.RENDER
+    ? "0.0.0.0"
+    : process.env.HOST || "0.0.0.0";
 
 /** Keep scheme + user + host + db name. Empty query flags from copy-paste break SRV. */
 function sanitizeMongoUri(raw: string): string {
