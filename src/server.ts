@@ -1,6 +1,8 @@
 import "dotenv/config";
+import http from "http";
 import app from "./app";
 import mongoose from "mongoose";
+import { attachChatSocket } from "./chat/chat.gateway";
 
 process.on("uncaughtException", (err) => {
   console.log("UNCAUGHT EXCEPTION 🔥 SHUTTING DOWN");
@@ -17,9 +19,13 @@ const dbConnect = async () => {
   console.log("************ DATABASE CONNECTED ************");
 };
 
-const server = app.listen(port, async () => {
+const server = http.createServer(app);
+attachChatSocket(server);
+
+server.listen(port, async () => {
   await dbConnect();
   console.log(`Sweet Feet API running on http://${HOST || "localhost"}:${port}`);
+  console.log(`Chat WebSocket on ws://${HOST || "localhost"}:${port}/ws/chat`);
 });
 
 process.on("unhandledRejection", (err: any) => {
