@@ -35,10 +35,17 @@
     "hpp": "^0.2.3",
     "jsonwebtoken": "^8.5.1",
     "moment": "^2.29.4",
+<<<<<<< HEAD
     "mongodb": "^7.6.0",
     "mongoose": "^6.3.5",
     "morgan": "^1.10.0",
     "slugify": "^1.6.5",
+=======
+    "mongoose": "^6.3.5",
+    "morgan": "^1.10.0",
+    "slugify": "^1.6.5",
+    "typescript": "5.4.5",
+>>>>>>> ddc442da016a4cb967b7e579cebf61e7d5f6489e
     "validator": "^13.7.0",
     "ws": "^8.18.0",
     "xss-clean": "^0.1.1"
@@ -49,14 +56,12 @@
     "@types/cookie-parser": "^1.4.3",
     "@types/cors": "^2.8.12",
     "@types/express": "4.17.21",
-    "@types/express-rate-limit": "^6.0.0",
     "@types/hpp": "^0.2.2",
     "@types/jsonwebtoken": "^8.5.8",
     "@types/morgan": "^1.9.3",
     "@types/node": "20.14.10",
     "@types/validator": "^13.7.4",
     "@types/ws": "^8.5.10",
-    "tsc-watch": "^5.0.3",
-    "typescript": "^4.9.5"
+    "tsc-watch": "^5.0.3"
   }
 }
