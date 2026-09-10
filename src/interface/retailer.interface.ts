@@ -2,6 +2,7 @@ export enum RetailerStatus {
   pending = "pending",
   approved = "approved",
   suspended = "suspended",
+  declined = "declined",
 }
 
 export interface RetailerProps {
