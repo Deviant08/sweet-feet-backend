@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { catchAsync } from "../middlewares/catchAsyncError.middleware";
 import { protect, protectRetailer, restrictTo } from "../middlewares/auth.middleware";
+import { AppError } from "../middlewares/handleAppError.middleware";
 import {
   sendSupportMessage,
   getSupportConversation,
@@ -10,32 +11,18 @@ import {
 
 const supportRouter = Router();
 
-/** Accept either an admin user token or a retailer token */
-const protectAdminOrRetailer = async (req: Request, res: Response, next: NextFunction) => {
-  // Try user/admin first via protect, but protect always sets user OR retailer from token type.
-  // We call protect which handles both JWT types already.
-  return protect(req, res, (err?: any) => {
+/** Accept admin user token or retailer token */
+const protectAdminOrRetailer = (req: Request, res: Response, next: NextFunction) => {
+  protect(req, res, (err?: any) => {
     if (err) return next(err);
-    // After protect: req.user (customer/admin) or req.retailer (and synthetic req.user role retailer)
     if (req.retailer) return next();
-    if (req.user && (req.user.role === "admin" || req.user.role === "retailer")) return next();
-    return next(new (require("../middlewares/handleAppError.middleware").AppError)("Forbidden", 403));
+    if (req.user && req.user.role === "admin") return next();
+    return next(new AppError("Only admins and retailers can use support chat", 403));
   });
 };
 
-supportRouter.get(
-  "/inbox",
-  protect,
-  restrictTo("admin"),
-  catchAsync(getSupportInbox)
-);
-
-supportRouter.get(
-  "/unread",
-  protectRetailer,
-  catchAsync(getSupportUnread)
-);
-
+supportRouter.get("/inbox", protect, restrictTo("admin"), catchAsync(getSupportInbox));
+supportRouter.get("/unread", protectRetailer, catchAsync(getSupportUnread));
 supportRouter.get("/", protectAdminOrRetailer, catchAsync(getSupportConversation));
 supportRouter.post("/", protectAdminOrRetailer, catchAsync(sendSupportMessage));
 
