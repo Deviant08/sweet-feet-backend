@@ -127,7 +127,11 @@ export const getConversation = async (req: Request, res: Response, next: NextFun
     return next(new AppError("Authentication required", 401));
   }
 
-  const messages = await Message.find(filter).sort({ createdAt: 1 }).limit(200);
+  const messages = await Message.find(filter)
+    .populate("retailer", "businessName location logo")
+    .populate("customer", "fullName email")
+    .sort({ createdAt: 1 })
+    .limit(200);
   res.status(200).json({ status: "Success", results: messages.length, data: messages });
 };
 
