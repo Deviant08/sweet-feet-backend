@@ -17,6 +17,7 @@ import orderRouter from "./routes/order.route";
 import retailerRouter from "./routes/retailer.route";
 import messageRouter from "./routes/message.route";
 import feedbackRouter from "./routes/feedback.route";
+import seedRouter from "./routes/seed.route";
 
 const app: Application = express();
 
@@ -64,6 +65,7 @@ app.use("/api/v1/orders", orderRouter);
 app.use("/api/v1/retailers", retailerRouter);
 app.use("/api/v1/messages", messageRouter);
 app.use("/api/v1/feedback", feedbackRouter);
+app.use("/api/v1/seed", seedRouter);
 
 app.all("*", (req: Request, _res: Response, next: NextFunction) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404));
