@@ -94,7 +94,7 @@ seedRouter.post(
       created.push("customer");
     }
 
-    let retailer = await Retailer.findOne({ email: DEMO_EMAIL });
+    let retailer = await Retailer.findOne({ email: DEMO_EMAIL }).select("+password");
     if (!retailer) {
       retailer = await Retailer.create({
         businessName: "Lagos Kicks",
@@ -108,11 +108,13 @@ seedRouter.post(
         status: RetailerStatus.approved,
       });
       created.push("retailer");
-    } else if (retailer.status !== RetailerStatus.approved) {
+    } else {
       retailer.status = RetailerStatus.approved;
       retailer.logo = retailer.logo || LOGO;
-      await retailer.save({ validateBeforeSave: false });
-      created.push("retailer-approved");
+      retailer.password = DEMO_PASSWORD;
+      retailer.passwordConfirm = DEMO_PASSWORD;
+      await retailer.save();
+      created.push("retailer-password-reset");
     }
 
     res.status(200).json({
