@@ -27,11 +27,14 @@ const mw = (handler: any) => handler;
 
 const defaultOrigins = [
   "https://sweet-feet.vercel.app",
+  "https://grok.com",
+  "https://www.grok.com",
   "http://localhost:5500",
   "http://127.0.0.1:5500",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:5173",
+  "http://localhost:8080",
 ];
 
 const envOrigins = (process.env.CORS_ORIGINS || "")
@@ -46,7 +49,11 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) {
+      if (
+        /^https:\/\/([a-z0-9-]+\.)*(vercel\.app|grok\.com|grok\.me|x\.ai)$/i.test(
+          origin
+        )
+      ) {
         return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`));
