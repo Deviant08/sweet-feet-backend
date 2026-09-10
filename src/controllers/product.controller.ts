@@ -13,7 +13,6 @@ export const getAllProducts = async (req: Request, res: Response) => {
   }
 
   const products = await Product.find(filter).sort({ createdAt: -1 });
-  // Only show products whose retailer is approved
   const filtered = products.filter(
     (p: any) => p.retailer && p.retailer.status === RetailerStatus.approved
   );
@@ -27,13 +26,20 @@ export const getProduct = async (req: Request, res: Response, next: NextFunction
   res.status(200).json({ status: "Success", data: product });
 };
 
-// Retailer: own products
 export const getMyProducts = async (req: Request, res: Response) => {
   const products = await Product.find({ retailer: req.retailer!.id }).sort({ createdAt: -1 });
   res.status(200).json({ status: "Success", results: products.length, data: products });
 };
 
 export const createProduct = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.retailer!.status !== RetailerStatus.approved) {
+    return next(
+      new AppError(
+        "Your retailer account is not approved yet. Wait for admin approval before listing products.",
+        403
+      )
+    );
+  }
   const { name, category, gender, price, oldPrice, color, badge, badgeLabel, img, sizes } = req.body;
   if (!name || !price || !img || !sizes) {
     return next(new AppError("name, price, img and sizes are required", 400));
@@ -56,6 +62,9 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
 };
 
 export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.retailer!.status !== RetailerStatus.approved) {
+    return next(new AppError("Your retailer account is not approved yet.", 403));
+  }
   const product = await Product.findOne({ _id: req.params.id, retailer: req.retailer!.id });
   if (!product) return next(new AppError("Product not found or you do not own it", 404));
 
