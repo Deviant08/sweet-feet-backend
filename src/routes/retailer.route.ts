@@ -3,6 +3,7 @@ import { catchAsync } from "../middlewares/catchAsyncError.middleware";
 import { protect, protectRetailer, restrictTo } from "../middlewares/auth.middleware";
 import {
   getApprovedRetailers,
+  getAllRetailers,
   getRetailer,
   updateMyProfile,
   setRetailerStatus,
@@ -11,6 +12,7 @@ import {
 const retailerRouter = Router();
 
 retailerRouter.get("/", catchAsync(getApprovedRetailers));
+retailerRouter.get("/admin/all", protect, restrictTo("admin"), catchAsync(getAllRetailers));
 retailerRouter.get("/:id", catchAsync(getRetailer));
 retailerRouter.patch("/me", protectRetailer, catchAsync(updateMyProfile));
 retailerRouter.patch("/:id/status", protect, restrictTo("admin"), catchAsync(setRetailerStatus));
