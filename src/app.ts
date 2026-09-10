@@ -18,6 +18,7 @@ import retailerRouter from "./routes/retailer.route";
 import messageRouter from "./routes/message.route";
 import feedbackRouter from "./routes/feedback.route";
 import seedRouter from "./routes/seed.route";
+import supportRouter from "./routes/support.route";
 
 const app: Application = express();
 
@@ -43,10 +44,8 @@ const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 app.use(
   cors({
     origin: (origin, callback) => {
-      // allow same-origin / tools with no Origin header
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      // allow any *.vercel.app preview deployment
       if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) {
         return callback(null, true);
       }
@@ -90,6 +89,7 @@ app.use("/api/v1/products", productRouter);
 app.use("/api/v1/orders", orderRouter);
 app.use("/api/v1/retailers", retailerRouter);
 app.use("/api/v1/messages", messageRouter);
+app.use("/api/v1/support", supportRouter);
 app.use("/api/v1/feedback", feedbackRouter);
 app.use("/api/v1/seed", seedRouter);
 
