@@ -21,24 +21,50 @@ import seedRouter from "./routes/seed.route";
 
 const app: Application = express();
 
-// Avoid Express overload / PathParams typing issues with some middleware packages
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mw = (handler: any) => handler;
 
-const origins = (process.env.CORS_ORIGINS || "http://localhost:3000")
+const defaultOrigins = [
+  "https://sweet-feet.vercel.app",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+];
+
+const envOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
 app.use(
   cors({
-    origin: origins.length ? origins : true,
+    origin: (origin, callback) => {
+      // allow same-origin / tools with no Origin header
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      // allow any *.vercel.app preview deployment
+      if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
   })
 );
 app.options("*", cors());
 
-app.use(mw(helmet()));
+app.use(
+  mw(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    })
+  )
+);
 app.use(mw(morgan("dev")));
 
 const limiter = rateLimit({
