@@ -10,6 +10,14 @@ export const getApprovedRetailers = async (_req: Request, res: Response) => {
   res.status(200).json({ status: "Success", results: retailers.length, data: retailers });
 };
 
+/** Admin: all retailers regardless of status */
+export const getAllRetailers = async (_req: Request, res: Response) => {
+  const retailers = await Retailer.find()
+    .select("-password -passwordResetToken -passwordResetTokenExpires")
+    .sort({ createdAt: -1 });
+  res.status(200).json({ status: "Success", results: retailers.length, data: retailers });
+};
+
 export const getRetailer = async (req: Request, res: Response, next: NextFunction) => {
   const retailer = await Retailer.findById(req.params.id).select(
     "-password -passwordResetToken -passwordResetTokenExpires"
@@ -32,7 +40,6 @@ export const updateMyProfile = async (req: Request, res: Response, next: NextFun
   res.status(200).json({ status: "Success", data: retailer });
 };
 
-// Admin: approve / suspend
 export const setRetailerStatus = async (req: Request, res: Response, next: NextFunction) => {
   const { status } = req.body;
   if (!Object.values(RetailerStatus).includes(status)) {
