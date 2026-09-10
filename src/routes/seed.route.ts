@@ -2,11 +2,14 @@ import { Router, Request, Response } from "express";
 import { catchAsync } from "../middlewares/catchAsyncError.middleware";
 import Retailer from "../models/retailer.model";
 import Product from "../models/product.model";
+import User from "../models/user.model";
 import { RetailerStatus } from "../interface/retailer.interface";
+import { UserRole } from "../interface/user.interface";
 
 const seedRouter = Router();
 
 const DEMO_EMAIL = "lagoskicks@sweetfeet.demo";
+const DEMO_PASSWORD = "SweetFeet123!";
 const LOGO =
   "https://ui-avatars.com/api/?name=Lagos+Kicks&background=160c02&color=f7dfb8&size=128&bold=true";
 
@@ -55,6 +58,78 @@ const SAMPLE_PRODUCTS = [
   },
 ];
 
+/** Create admin + customer + approved retailer if missing */
+seedRouter.post(
+  "/accounts",
+  catchAsync(async (_req: Request, res: Response) => {
+    const created: string[] = [];
+
+    let admin = await User.findOne({ email: "admin@sweetfeet.demo" });
+    if (!admin) {
+      admin = await User.create({
+        fullName: "Sweet Feet Admin",
+        email: "admin@sweetfeet.demo",
+        phone: "08000000000",
+        password: DEMO_PASSWORD,
+        passwordConfirm: DEMO_PASSWORD,
+        role: UserRole.admin,
+      });
+      created.push("admin");
+    } else if (admin.role !== UserRole.admin) {
+      admin.role = UserRole.admin;
+      await admin.save({ validateBeforeSave: false });
+      created.push("admin-role-updated");
+    }
+
+    let customer = await User.findOne({ email: "customer@sweetfeet.demo" });
+    if (!customer) {
+      customer = await User.create({
+        fullName: "Demo Customer",
+        email: "customer@sweetfeet.demo",
+        phone: "08011111111",
+        password: DEMO_PASSWORD,
+        passwordConfirm: DEMO_PASSWORD,
+        role: UserRole.customer,
+      });
+      created.push("customer");
+    }
+
+    let retailer = await Retailer.findOne({ email: DEMO_EMAIL });
+    if (!retailer) {
+      retailer = await Retailer.create({
+        businessName: "Lagos Kicks",
+        email: DEMO_EMAIL,
+        phone: "08022222222",
+        location: "Lagos, Nigeria",
+        bio: "Premium trainers and everyday kicks shipped across Nigeria.",
+        logo: LOGO,
+        password: DEMO_PASSWORD,
+        passwordConfirm: DEMO_PASSWORD,
+        status: RetailerStatus.approved,
+      });
+      created.push("retailer");
+    } else if (retailer.status !== RetailerStatus.approved) {
+      retailer.status = RetailerStatus.approved;
+      retailer.logo = retailer.logo || LOGO;
+      await retailer.save({ validateBeforeSave: false });
+      created.push("retailer-approved");
+    }
+
+    res.status(200).json({
+      status: "Success",
+      message: "Demo accounts ready",
+      data: {
+        created,
+        accounts: {
+          admin: { email: "admin@sweetfeet.demo", password: DEMO_PASSWORD, login: "/nav/login.html (Admin)" },
+          customer: { email: "customer@sweetfeet.demo", password: DEMO_PASSWORD, login: "/nav/login.html (Customer)" },
+          retailer: { email: DEMO_EMAIL, password: DEMO_PASSWORD, login: "/nav/login.html (Retailer)" },
+        },
+      },
+    });
+  })
+);
+
 seedRouter.post(
   "/demo",
   catchAsync(async (_req: Request, res: Response) => {
@@ -62,7 +137,7 @@ seedRouter.post(
     if (!retailer) {
       return res.status(404).json({
         status: "Failed",
-        message: `Demo retailer ${DEMO_EMAIL} not found. Register it first.`,
+        message: `Demo retailer ${DEMO_EMAIL} not found. Call POST /api/v1/seed/accounts first.`,
       });
     }
 
@@ -73,7 +148,6 @@ seedRouter.post(
       "Premium trainers and everyday kicks shipped across Nigeria.";
     await retailer.save({ validateBeforeSave: false });
 
-    // Remove previous demo products for this retailer, then re-seed
     await Product.deleteMany({ retailer: retailer._id });
 
     const created = await Product.insertMany(
