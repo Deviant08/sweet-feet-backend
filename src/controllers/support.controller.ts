@@ -12,7 +12,7 @@ export const sendSupportMessage = async (req: Request, res: Response, next: Next
   if (req.user && req.user.role === "admin") {
     const retailerId = req.body.retailerId;
     if (!retailerId) return next(new AppError("retailerId is required", 400));
-    const retailer = await Retailer.findById(retailerId);
+    const retailer = await Retailer.findById(retailerId).select("_id").lean();
     if (!retailer) return next(new AppError("Retailer not found", 404));
 
     const msg = await SupportMessage.create({
@@ -52,9 +52,10 @@ export const getSupportConversation = async (req: Request, res: Response, next: 
 
   const messages = await SupportMessage.find({ retailer: retailerId })
     .sort({ createdAt: 1 })
-    .limit(300);
+    .limit(300)
+    .lean();
 
-  // Mark messages from the other party as read
+  // Mark messages from the other party as read (fire-and-forget style, still awaited for consistency)
   if (req.user && req.user.role === "admin") {
     await SupportMessage.updateMany(
       { retailer: retailerId, senderType: "retailer", isRead: false },
@@ -70,46 +71,75 @@ export const getSupportConversation = async (req: Request, res: Response, next: 
   res.status(200).json({ status: "Success", results: messages.length, data: messages });
 };
 
-/** Admin inbox: retailers with last message + unread counts */
+/**
+ * Admin inbox: retailers with last message + unread counts.
+ * Uses one aggregation over SupportMessage + one Retailer.find instead of N+1.
+ */
 export const getSupportInbox = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || req.user.role !== "admin") {
     return next(new AppError("Admin only", 403));
   }
 
-  const retailers = await Retailer.find()
-    .select("businessName email status location logo")
-    .sort({ createdAt: -1 });
-
-  const threads = await Promise.all(
-    retailers.map(async (r) => {
-      const last = await SupportMessage.findOne({ retailer: r._id }).sort({ createdAt: -1 });
-      const unread = await SupportMessage.countDocuments({
-        retailer: r._id,
-        senderType: "retailer",
-        isRead: false,
-      });
-      return {
-        retailer: {
-          id: r._id,
-          businessName: r.businessName,
-          email: r.email,
-          status: r.status,
-          location: r.location,
-          logo: r.logo,
+  const [retailers, stats] = await Promise.all([
+    Retailer.find()
+      .select("businessName email status location logo")
+      .sort({ createdAt: -1 })
+      .lean(),
+    SupportMessage.aggregate([
+      {
+        $group: {
+          _id: "$retailer",
+          lastMessage: { $last: "$message" },
+          lastSenderType: { $last: "$senderType" },
+          lastCreatedAt: { $last: "$createdAt" },
+          unread: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ["$senderType", "retailer"] }, { $eq: ["$isRead", false] }] },
+                1,
+                0,
+              ],
+            },
+          },
         },
-        lastMessage: last
+      },
+    ]),
+  ]);
+
+  const byRetailer = new Map(
+    stats.map((s: any) => [
+      String(s._id),
+      {
+        lastMessage: s.lastMessage
           ? {
-              message: last.message,
-              senderType: last.senderType,
-              createdAt: last.createdAt,
+              message: s.lastMessage,
+              senderType: s.lastSenderType,
+              createdAt: s.lastCreatedAt,
             }
           : null,
-        unread,
-      };
-    })
+        unread: s.unread || 0,
+      },
+    ])
   );
 
-  // Put threads with activity first
+  const threads = retailers.map((r: any) => {
+    const id = String(r._id);
+    const meta = byRetailer.get(id) || { lastMessage: null, unread: 0 };
+    return {
+      retailer: {
+        id: r._id,
+        businessName: r.businessName,
+        email: r.email,
+        status: r.status,
+        location: r.location,
+        logo: r.logo,
+      },
+      lastMessage: meta.lastMessage,
+      unread: meta.unread,
+    };
+  });
+
+  // Activity first
   threads.sort((a, b) => {
     const ta = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
     const tb = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
