@@ -2,16 +2,13 @@ import User from "../models/user.model";
 import { UserRole } from "../interface/user.interface";
 
 const DEFAULT_ADMIN_EMAIL = "nnimoyoefoki@gmail.com";
+const DEFAULT_ADMIN_USERNAME = "10thmav";
 
-/**
- * Creates or promotes the operator admin.
- * Email defaults to the platform owner. Password comes only from ADMIN_PASSWORD
- * (Render environment) and is never committed.
- */
 export async function ensureAdmin(): Promise<void> {
   const email = (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+  const username = (process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME).trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD || "";
-  const fullName = (process.env.ADMIN_NAME || "Nnimoyo Efoki").trim();
+  const fullName = (process.env.ADMIN_NAME || "10thmav").trim();
 
   if (!password) {
     console.log("ADMIN_PASSWORD is not set — operator admin will not be created or updated");
@@ -22,10 +19,11 @@ export async function ensureAdmin(): Promise<void> {
     return;
   }
 
-  let user = await User.findOne({ email }).select("+password");
+  let user = await User.findOne({ $or: [{ email }, { username }] }).select("+password");
   if (!user) {
     user = await User.create({
       fullName,
+      username,
       email,
       phone: process.env.ADMIN_PHONE || undefined,
       password,
@@ -33,15 +31,17 @@ export async function ensureAdmin(): Promise<void> {
       role: UserRole.admin,
       active: true,
     });
-    console.log(`Operator admin created: ${email}`);
+    console.log(`Operator admin created: ${username} <${email}>`);
     return;
   }
 
   user.role = UserRole.admin;
   user.active = true;
-  if (fullName) user.fullName = fullName;
+  user.fullName = fullName;
+  user.username = username;
+  user.email = email;
   user.password = password;
   user.passwordConfirm = password;
   await user.save();
-  console.log(`Operator admin updated: ${email}`);
+  console.log(`Operator admin updated: ${username} <${email}>`);
 }

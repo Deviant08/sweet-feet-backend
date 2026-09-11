@@ -17,6 +17,13 @@ const userSchema = new Schema<UserProps, UserModel, UserMethods>(
       trim: true,
       required: [true, "Please enter your full name"],
     },
+    username: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      sparse: true,
+    },
     email: {
       type: String,
       unique: true,
