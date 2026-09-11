@@ -55,7 +55,6 @@ export const getSupportConversation = async (req: Request, res: Response, next: 
     .limit(300)
     .lean();
 
-  // Mark messages from the other party as read (fire-and-forget style, still awaited for consistency)
   if (req.user && req.user.role === "admin") {
     await SupportMessage.updateMany(
       { retailer: retailerId, senderType: "retailer", isRead: false },
@@ -73,7 +72,7 @@ export const getSupportConversation = async (req: Request, res: Response, next: 
 
 /**
  * Admin inbox: retailers with last message + unread counts.
- * Uses one aggregation over SupportMessage + one Retailer.find instead of N+1.
+ * One Retailer.find + one aggregation (no N+1).
  */
 export const getSupportInbox = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || req.user.role !== "admin") {
@@ -86,6 +85,7 @@ export const getSupportInbox = async (req: Request, res: Response, next: NextFun
       .sort({ createdAt: -1 })
       .lean(),
     SupportMessage.aggregate([
+      { $sort: { createdAt: 1 } },
       {
         $group: {
           _id: "$retailer",
@@ -95,7 +95,9 @@ export const getSupportInbox = async (req: Request, res: Response, next: NextFun
           unread: {
             $sum: {
               $cond: [
-                { $and: [{ $eq: ["$senderType", "retailer"] }, { $eq: ["$isRead", false] }] },
+                {
+                  $and: [{ $eq: ["$senderType", "retailer"] }, { $eq: ["$isRead", false] }],
+                },
                 1,
                 0,
               ],
@@ -139,7 +141,6 @@ export const getSupportInbox = async (req: Request, res: Response, next: NextFun
     };
   });
 
-  // Activity first
   threads.sort((a, b) => {
     const ta = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
     const tb = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
