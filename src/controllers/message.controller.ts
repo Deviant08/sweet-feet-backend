@@ -7,12 +7,53 @@ import { UserRole } from "../interface/user.interface";
 
 const isAdmin = (req: Request) => req.user?.role === UserRole.admin || req.user?.role === "admin";
 
-/** Find any platform admin user id (for retailer → admin threads). */
 async function resolveAdminId(preferred?: string) {
   if (preferred) return preferred;
   const admin = await User.findOne({ role: UserRole.admin }).select("_id");
   return admin ? String(admin._id) : null;
 }
+
+export const getUnreadCount = async (req: Request, res: Response) => {
+  const filter: Record<string, unknown> = { isRead: false };
+
+  if (req.retailer) {
+    filter.retailer = req.retailer.id;
+    filter.senderType = { $in: ["customer", "admin"] };
+  } else if (isAdmin(req) && !req.retailer) {
+    filter.threadType = "staff";
+    filter.senderType = "retailer";
+  } else if (req.user) {
+    filter.customer = req.user.id;
+    filter.senderType = "retailer";
+    filter.threadType = { $ne: "staff" };
+  } else {
+    return res.status(200).json({ status: "Success", data: { unread: 0, shop: 0, staff: 0 } });
+  }
+
+  if (req.retailer) {
+    const [shop, staff] = await Promise.all([
+      Message.countDocuments({
+        retailer: req.retailer.id,
+        isRead: false,
+        senderType: "customer",
+        threadType: { $ne: "staff" },
+      }),
+      Message.countDocuments({
+        retailer: req.retailer.id,
+        isRead: false,
+        senderType: "admin",
+        threadType: "staff",
+      }),
+    ]);
+    return res.status(200).json({
+      status: "Success",
+      data: { unread: shop, shop, staff },
+    });
+  }
+
+  const unread = await Message.countDocuments(filter);
+  res.status(200).json({ status: "Success", data: { unread, shop: unread, staff: 0 } });
+};
 
 export const sendMessage = async (req: Request, res: Response, next: NextFunction) => {
   const { retailerId, customerId, adminId, productId, orderId, message, threadType } = req.body;
@@ -23,7 +64,6 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
   const text = String(message).trim();
   const wantStaff = threadType === "staff" || !!adminId || (isAdmin(req) && !!retailerId && !customerId);
 
-  // ── Staff thread: admin ↔ retailer ─────────────────────────
   if (wantStaff || (req.retailer && req.body.toAdmin)) {
     let admin: string | null = null;
     let retailer: string;
@@ -56,7 +96,6 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
     return res.status(201).json({ status: "Success", data: msg });
   }
 
-  // ── Shop thread: customer ↔ retailer ───────────────────────
   let senderType: "customer" | "retailer";
   let customer: string;
   let retailer: string;
@@ -92,13 +131,11 @@ export const getConversation = async (req: Request, res: Response, next: NextFun
   const { retailerId, customerId, threadType } = req.query;
   const filter: any = {};
 
-  // Staff inbox / conversation
   if (threadType === "staff" || (isAdmin(req) && !customerId)) {
     filter.threadType = "staff";
 
     if (isAdmin(req) && !req.retailer) {
       if (retailerId) filter.retailer = retailerId;
-      // admin sees all staff threads (optionally filtered by retailer)
     } else if (req.retailer) {
       filter.retailer = req.retailer.id;
     } else {
@@ -111,10 +148,21 @@ export const getConversation = async (req: Request, res: Response, next: NextFun
       .sort({ createdAt: 1 })
       .limit(300);
 
+    if (req.retailer && !isAdmin(req)) {
+      await Message.updateMany(
+        { ...filter, senderType: "admin", isRead: false },
+        { isRead: true }
+      );
+    } else if (isAdmin(req) && retailerId) {
+      await Message.updateMany(
+        { threadType: "staff", retailer: retailerId, senderType: "retailer", isRead: false },
+        { isRead: true }
+      );
+    }
+
     return res.status(200).json({ status: "Success", results: messages.length, data: messages });
   }
 
-  // Shop threads
   filter.threadType = { $ne: "staff" };
 
   if (req.retailer) {
@@ -132,10 +180,34 @@ export const getConversation = async (req: Request, res: Response, next: NextFun
     .populate("customer", "fullName email")
     .sort({ createdAt: 1 })
     .limit(200);
+
+  if (req.retailer && customerId) {
+    await Message.updateMany(
+      {
+        retailer: req.retailer.id,
+        customer: customerId,
+        senderType: "customer",
+        isRead: false,
+        threadType: { $ne: "staff" },
+      },
+      { isRead: true }
+    );
+  } else if (req.user && !req.retailer && retailerId) {
+    await Message.updateMany(
+      {
+        customer: req.user.id,
+        retailer: retailerId,
+        senderType: "retailer",
+        isRead: false,
+        threadType: { $ne: "staff" },
+      },
+      { isRead: true }
+    );
+  }
+
   res.status(200).json({ status: "Success", results: messages.length, data: messages });
 };
 
-/** Admin: list retailers for starting staff chats */
 export const listStaffPartners = async (req: Request, res: Response, next: NextFunction) => {
   if (!isAdmin(req) || req.retailer) {
     return next(new AppError("Admin only", 403));
