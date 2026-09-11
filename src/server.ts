@@ -3,6 +3,7 @@ import http from "http";
 import app from "./app";
 import mongoose from "mongoose";
 import { attachChatSocket } from "./chat/chat.gateway";
+import { ensureAdmin } from "./utils/ensureAdmin";
 
 mongoose.set("strictQuery", false);
 
@@ -14,13 +15,11 @@ process.on("uncaughtException", (err) => {
 
 const port = Number(process.env.PORT) || 5000;
 const isProd = process.env.NODE_ENV === "production";
-// Render (and most hosts) need 0.0.0.0 — never bind 127.0.0.1 in production
 const host =
   isProd || process.env.RENDER
     ? "0.0.0.0"
     : process.env.HOST || "0.0.0.0";
 
-/** Keep scheme + user + host + db name. Empty query flags from copy-paste break SRV. */
 function sanitizeMongoUri(raw: string): string {
   let uri = raw.trim().replace(/^['"]|['"]$/g, "");
   const q = uri.indexOf("?");
@@ -65,11 +64,9 @@ const dbConnect = async () => {
 const start = async () => {
   try {
     await dbConnect();
+    await ensureAdmin();
   } catch (err: any) {
-    console.error("MongoDB connection failed:", err?.name, err?.message);
-    console.error(
-      "Fix: Atlas → Network Access → Allow Access from Anywhere (0.0.0.0/0). Check username/password in DATABASE_HOSTED."
-    );
+    console.error("Startup failed:", err?.name, err?.message);
     process.exit(1);
   }
 
