@@ -1,17 +1,20 @@
 import User from "../models/user.model";
 import { UserRole } from "../interface/user.interface";
 
+const DEFAULT_ADMIN_EMAIL = "nnimoyoefoki@gmail.com";
+
 /**
- * Creates or promotes the operator admin from environment variables.
- * Set ADMIN_EMAIL and ADMIN_PASSWORD on Render. Never commit the password.
+ * Creates or promotes the operator admin.
+ * Email defaults to the platform owner. Password comes only from ADMIN_PASSWORD
+ * (Render environment) and is never committed.
  */
 export async function ensureAdmin(): Promise<void> {
-  const email = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const email = (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD || "";
-  const fullName = (process.env.ADMIN_NAME || "Sweet Feet Operator").trim();
+  const fullName = (process.env.ADMIN_NAME || "Nnimoyo Efoki").trim();
 
-  if (!email || !password) {
-    console.log("ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping operator admin bootstrap");
+  if (!password) {
+    console.log("ADMIN_PASSWORD is not set — operator admin will not be created or updated");
     return;
   }
   if (password.length < 8) {
