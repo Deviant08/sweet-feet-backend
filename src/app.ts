@@ -17,27 +17,60 @@ import orderRouter from "./routes/order.route";
 import retailerRouter from "./routes/retailer.route";
 import messageRouter from "./routes/message.route";
 import feedbackRouter from "./routes/feedback.route";
+import seedRouter from "./routes/seed.route";
+import supportRouter from "./routes/support.route";
 
 const app: Application = express();
 
-// Avoid Express overload / PathParams typing issues with some middleware packages
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mw = (handler: any) => handler;
 
-const origins = (process.env.CORS_ORIGINS || "http://localhost:3000")
+const defaultOrigins = [
+  "https://sweet-feet.vercel.app",
+  "https://grok.com",
+  "https://www.grok.com",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+const envOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
 app.use(
   cors({
-    origin: origins.length ? origins : true,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (
+        /^https:\/\/([a-z0-9-]+\.)*(vercel\.app|grok\.com|grok\.me|x\.ai)$/i.test(
+          origin
+        )
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
   })
 );
 app.options("*", cors());
 
-app.use(mw(helmet()));
+app.use(
+  mw(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    })
+  )
+);
 app.use(mw(morgan("dev")));
 
 const limiter = rateLimit({
@@ -63,7 +96,9 @@ app.use("/api/v1/products", productRouter);
 app.use("/api/v1/orders", orderRouter);
 app.use("/api/v1/retailers", retailerRouter);
 app.use("/api/v1/messages", messageRouter);
+app.use("/api/v1/support", supportRouter);
 app.use("/api/v1/feedback", feedbackRouter);
+app.use("/api/v1/seed", seedRouter);
 
 app.all("*", (req: Request, _res: Response, next: NextFunction) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404));

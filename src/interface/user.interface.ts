@@ -5,6 +5,7 @@ export enum UserRole {
 
 export interface UserProps {
   fullName: string;
+  username?: string;
   email: string;
   phone?: string;
   password: string;

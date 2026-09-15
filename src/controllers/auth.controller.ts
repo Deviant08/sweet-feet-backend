@@ -6,7 +6,6 @@ import { AppError } from "../middlewares/handleAppError.middleware";
 import { createSendToken } from "../middlewares/auth.middleware";
 import { UserRole } from "../interface/user.interface";
 
-// Customer signup
 export const signUp = async (req: Request, res: Response, next: NextFunction) => {
   const { fullName, email, phone, password, passwordConfirm } = req.body;
   if (!fullName || !email || !password) {
@@ -24,6 +23,7 @@ export const signUp = async (req: Request, res: Response, next: NextFunction) =>
     {
       id: user._id,
       fullName: user.fullName,
+      username: user.username,
       email: user.email,
       phone: user.phone,
       role: user.role,
@@ -34,13 +34,18 @@ export const signUp = async (req: Request, res: Response, next: NextFunction) =>
   );
 };
 
-// Customer login
 export const login = async (req: Request, res: Response, next: NextFunction) => {
-  const { email, password } = req.body;
-  if (!email || !password || !validator.isEmail(email)) {
-    return next(new AppError("Please provide a valid email and password", 400));
+  const identifier = String(req.body.email || req.body.username || "").trim();
+  const { password } = req.body;
+  if (!identifier || !password) {
+    return next(new AppError("Please provide username/email and password", 400));
   }
-  const user = await User.findOne({ email }).select("+password");
+
+  const query = validator.isEmail(identifier)
+    ? { email: identifier.toLowerCase() }
+    : { username: identifier.toLowerCase() };
+
+  const user = await User.findOne(query).select("+password");
   if (!user || !(await user.comparePasswords(password, user.password))) {
     return next(new AppError("Invalid login credentials", 401));
   }
@@ -48,6 +53,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     {
       id: user._id,
       fullName: user.fullName,
+      username: user.username,
       email: user.email,
       phone: user.phone,
       role: user.role,
@@ -58,7 +64,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   );
 };
 
-// Retailer signup
 export const retailerSignUp = async (req: Request, res: Response, next: NextFunction) => {
   const { businessName, email, phone, location, bio, password, passwordConfirm } = req.body;
   if (!businessName || !email || !password) {
@@ -88,7 +93,6 @@ export const retailerSignUp = async (req: Request, res: Response, next: NextFunc
   );
 };
 
-// Retailer login
 export const retailerLogin = async (req: Request, res: Response, next: NextFunction) => {
   const { email, password } = req.body;
   if (!email || !password || !validator.isEmail(email)) {

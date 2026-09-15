@@ -3,37 +3,53 @@ import Product from "../models/product.model";
 import { AppError } from "../middlewares/handleAppError.middleware";
 import { RetailerStatus } from "../interface/retailer.interface";
 
-// Public: list active products from approved retailers
+// Public: list active products from approved retailers only
 export const getAllProducts = async (req: Request, res: Response) => {
-  const filter: any = { isActive: true };
+  const filter: Record<string, unknown> = { isActive: true };
   if (req.query.category) filter.category = req.query.category;
   if (req.query.gender) filter.gender = req.query.gender;
   if (req.query.search) {
     filter.name = { $regex: String(req.query.search), $options: "i" };
   }
 
-  const products = await Product.find(filter).sort({ createdAt: -1 });
-  // Only show products whose retailer is approved
-  const filtered = products.filter(
-    (p: any) => p.retailer && p.retailer.status === RetailerStatus.approved
-  );
+  // pre(/^find/) already populates retailer; match:approved drops unapproved at DB layer
+  const products = await Product.find(filter)
+    .populate({
+      path: "retailer",
+      match: { status: RetailerStatus.approved },
+      select: "businessName location logo phone status",
+    })
+    .sort({ createdAt: -1 })
+    .lean();
 
-  res.status(200).json({ status: "Success", results: filtered.length, data: filtered });
+  // populate match leaves retailer: null for non-approved — drop those rows
+  const data = products.filter((p: any) => p.retailer);
+
+  res.status(200).json({ status: "Success", results: data.length, data });
 };
 
 export const getProduct = async (req: Request, res: Response, next: NextFunction) => {
-  const product = await Product.findById(req.params.id);
+  const product = await Product.findById(req.params.id).lean();
   if (!product || !product.isActive) return next(new AppError("Product not found", 404));
   res.status(200).json({ status: "Success", data: product });
 };
 
-// Retailer: own products
 export const getMyProducts = async (req: Request, res: Response) => {
-  const products = await Product.find({ retailer: req.retailer!.id }).sort({ createdAt: -1 });
+  const products = await Product.find({ retailer: req.retailer!.id })
+    .sort({ createdAt: -1 })
+    .lean();
   res.status(200).json({ status: "Success", results: products.length, data: products });
 };
 
 export const createProduct = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.retailer!.status !== RetailerStatus.approved) {
+    return next(
+      new AppError(
+        "Your retailer account is not approved yet. Wait for admin approval before listing products.",
+        403
+      )
+    );
+  }
   const { name, category, gender, price, oldPrice, color, badge, badgeLabel, img, sizes } = req.body;
   if (!name || !price || !img || !sizes) {
     return next(new AppError("name, price, img and sizes are required", 400));
@@ -56,6 +72,9 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
 };
 
 export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.retailer!.status !== RetailerStatus.approved) {
+    return next(new AppError("Your retailer account is not approved yet.", 403));
+  }
   const product = await Product.findOne({ _id: req.params.id, retailer: req.retailer!.id });
   if (!product) return next(new AppError("Product not found or you do not own it", 404));
 
