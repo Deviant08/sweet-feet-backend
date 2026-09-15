@@ -11,7 +11,21 @@ function asId(value: any): string {
   return String(value);
 }
 
+function paystackSecret(): string {
+  return String(process.env.PAYSTACK_SECRET_KEY || "").trim();
+}
+
 export const createOrder = async (req: Request, res: Response, next: NextFunction) => {
+  const secret = paystackSecret();
+  if (!secret) {
+    return next(
+      new AppError(
+        "Payments are not configured. Add PAYSTACK_SECRET_KEY in the Render environment, then redeploy.",
+        503
+      )
+    );
+  }
+
   const { items, email } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return next(new AppError("Order items are required", 400));
@@ -48,60 +62,63 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     status: OrderStatus.pending,
   });
 
-  // Initiate Paystack payment
-  const secret = process.env.PAYSTACK_SECRET_KEY;
-  if (secret) {
-    try {
-      const paystackRes = await axios.post(
-        "https://api.paystack.co/transaction/initialize",
-        {
-          email: email || req.user?.email,
-          amount: Math.round(total * 100), // kobo
-          metadata: { orderId: order._id.toString() },
-          callback_url: req.body.callbackUrl,
-        },
-        { headers: { Authorization: `Bearer ${secret}` } }
-      );
-      const { authorization_url, reference } = paystackRes.data.data;
-      order.paystackRef = reference;
-      await order.save();
-      return res.status(201).json({
-        status: "Success",
-        data: { order, authorization_url, reference },
-      });
-    } catch (err: any) {
-      return next(new AppError(`Paystack error: ${err.response?.data?.message || err.message}`, 502));
-    }
+  try {
+    const paystackRes = await axios.post(
+      "https://api.paystack.co/transaction/initialize",
+      {
+        email: email || req.user?.email,
+        amount: Math.round(total * 100),
+        metadata: { orderId: order._id.toString() },
+        callback_url: req.body.callbackUrl,
+      },
+      { headers: { Authorization: `Bearer ${secret}` } }
+    );
+    const { authorization_url, reference } = paystackRes.data.data;
+    order.paystackRef = reference;
+    await order.save();
+    return res.status(201).json({
+      status: "Success",
+      data: { order, authorization_url, reference },
+    });
+  } catch (err: any) {
+    return next(new AppError(`Paystack error: ${err.response?.data?.message || err.message}`, 502));
   }
-
-  res.status(201).json({ status: "Success", data: { order } });
 };
 
 export const verifyPayment = async (req: Request, res: Response, next: NextFunction) => {
-  const { reference } = req.body;
+  const reference = String(
+    req.body?.reference || req.query?.reference || req.query?.trxref || ""
+  ).trim();
   if (!reference) return next(new AppError("Payment reference required", 400));
 
-  const secret = process.env.PAYSTACK_SECRET_KEY;
-  if (!secret) return next(new AppError("Paystack not configured", 500));
+  const secret = paystackSecret();
+  if (!secret) return next(new AppError("Paystack not configured. Add PAYSTACK_SECRET_KEY on Render.", 503));
 
   try {
-    const paystackRes = await axios.get(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      { headers: { Authorization: `Bearer ${secret}` } }
-    );
+    const paystackRes = await axios.get(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      headers: { Authorization: `Bearer ${secret}` },
+    });
     const data = paystackRes.data.data;
     if (data.status !== "success") {
       return next(new AppError("Payment not successful", 400));
     }
 
-    const order = await Order.findOne({ paystackRef: reference });
+    const orderId = data.metadata?.orderId;
+    let order = await Order.findOne({ paystackRef: reference });
+    if (!order && orderId) order = await Order.findById(orderId);
     if (!order) return next(new AppError("Order not found for this reference", 404));
 
-    order.status = OrderStatus.paid;
-    await order.save();
+    if (!order.paystackRef) {
+      order.paystackRef = reference;
+    }
+    if (order.status !== OrderStatus.paid) {
+      order.status = OrderStatus.paid;
+      await order.save();
+    }
 
     res.status(200).json({ status: "Success", data: order });
   } catch (err: any) {
+    if (err instanceof AppError) return next(err);
     return next(new AppError(`Verify failed: ${err.response?.data?.message || err.message}`, 502));
   }
 };

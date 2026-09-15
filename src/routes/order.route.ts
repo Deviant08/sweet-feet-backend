@@ -14,6 +14,7 @@ const orderRouter = Router();
 
 orderRouter.post("/", protect, catchAsync(createOrder));
 orderRouter.post("/verify", catchAsync(verifyPayment));
+orderRouter.get("/verify", catchAsync(verifyPayment));
 orderRouter.get("/mine", protect, catchAsync(getMyOrders));
 orderRouter.get("/retailer", protectRetailer, catchAsync(getRetailerOrders));
 orderRouter.patch("/item-status", protectRetailer, catchAsync(updateItemStatus));
