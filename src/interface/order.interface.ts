@@ -24,6 +24,7 @@ export interface OrderItemProps {
   unitPrice: number;
   subtotal: number;
   status: ItemStatus;
+  note?: string;
 }
 
 export interface OrderProps {

@@ -5,6 +5,12 @@ import Product from "../models/product.model";
 import { AppError } from "../middlewares/handleAppError.middleware";
 import { OrderStatus, ItemStatus } from "../interface/order.interface";
 
+function asId(value: any): string {
+  if (!value) return "";
+  if (typeof value === "object") return String(value._id || value.id || "");
+  return String(value);
+}
+
 export const createOrder = async (req: Request, res: Response, next: NextFunction) => {
   const { items, email } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -106,8 +112,14 @@ export const getMyOrders = async (req: Request, res: Response) => {
 };
 
 export const getRetailerOrders = async (req: Request, res: Response) => {
+  const retailerId = asId(req.retailer!.id);
   const orders = await Order.find({ "items.retailer": req.retailer!.id }).sort({ orderedAt: -1 });
-  res.status(200).json({ status: "Success", results: orders.length, data: orders });
+  const data = orders.map((order) => {
+    const json = order.toJSON();
+    json.items = (json.items || []).filter((it: any) => asId(it.retailer) === retailerId);
+    return json;
+  });
+  res.status(200).json({ status: "Success", results: data.length, data });
 };
 
 export const updateItemStatus = async (req: Request, res: Response, next: NextFunction) => {
@@ -122,16 +134,24 @@ export const updateItemStatus = async (req: Request, res: Response, next: NextFu
   const order = await Order.findById(orderId);
   if (!order) return next(new AppError("Order not found", 404));
 
-  const item = (order.items as any).id(itemId);
+  const item =
+    (order.items as any).id?.(itemId) ||
+    (order.items as any).find((it: any) => asId(it._id) === String(itemId));
   if (!item) return next(new AppError("Order item not found", 404));
-  if (String(item.retailer) !== String(req.retailer!.id)) {
+
+  const itemRetailerId = asId(item.retailer);
+  const loggedInRetailerId = asId(req.retailer!.id);
+  if (!itemRetailerId || itemRetailerId !== loggedInRetailerId) {
     return next(new AppError("You do not own this order item", 403));
   }
 
   item.status = status;
+  if (typeof note === "string" && note.trim()) {
+    item.note = note.trim();
+  }
   await order.save();
 
-  res.status(200).json({ status: "Success", data: order, note });
+  res.status(200).json({ status: "Success", data: order });
 };
 
 export const getOrder = async (req: Request, res: Response, next: NextFunction) => {

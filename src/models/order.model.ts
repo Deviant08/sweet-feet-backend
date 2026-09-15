@@ -15,6 +15,7 @@ const orderItemSchema = new Schema(
       enum: Object.values(ItemStatus),
       default: ItemStatus.placed,
     },
+    note: { type: String, default: "" },
   },
   { _id: true }
 );
