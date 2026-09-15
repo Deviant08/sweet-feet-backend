@@ -1,0 +1,23 @@
+# Local MongoDB only. Render / Atlas are not used and are not changed.
+# Start: docker compose up -d
+# Stop:  docker compose down
+services:
+  mongo:
+    image: mongo:7
+    container_name: sweetfeet-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: sweetfeet
+    volumes:
+      - sweetfeet_mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 8s
+
+volumes:
+  sweetfeet_mongo:

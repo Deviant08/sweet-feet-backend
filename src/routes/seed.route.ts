@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { catchAsync } from "../middlewares/catchAsyncError.middleware";
 import Retailer from "../models/retailer.model";
 import Product from "../models/product.model";
@@ -9,6 +9,19 @@ import { UserRole } from "../interface/user.interface";
 const seedRouter = Router();
 
 const DEMO_PASSWORD = "SweetFeet123!";
+
+function blockProduction(_req: Request, res: Response, next: NextFunction) {
+  if (process.env.NODE_ENV === "production" || process.env.RENDER) {
+    res.status(403).json({
+      status: "Failed",
+      message: "Seed is disabled on the live Render / Atlas database",
+    });
+    return;
+  }
+  next();
+}
+
+seedRouter.use(blockProduction);
 
 const RETAILERS = [
   {

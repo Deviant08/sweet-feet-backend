@@ -15,13 +15,21 @@ Frontend repo: [Deviant08/Sweet-Feet](https://github.com/Deviant08/Sweet-Feet)
 
 ## Setup (local)
 
+The live site on Render + MongoDB Atlas is unchanged. This is a **separate**
+database on your machine.
+
 ```bash
 cd sweet-feet-backend
 cp .env.example .env
-# edit .env — MongoDB URI, JWT_SECRET, Paystack keys, CORS_ORIGINS
+# .env already points at local Mongo:
+#   DATABASE_HOSTED=mongodb://127.0.0.1:27017/sweetfeet
+#   NODE_ENV=development
+# Do not paste the Atlas mongodb+srv URI here.
 
+docker compose up -d          # local Mongo on port 27017
 npm install
-npm run dev
+npm run dev                   # API on http://localhost:5000
+npm run seed                  # demo retailers + products (local only)
 ```
 
 API base: **`http://localhost:5000/api/v1`**
@@ -30,17 +38,35 @@ Chat socket: **`ws://localhost:5000/ws/chat?token=JWT`**
 
 Health check: `GET http://localhost:5000/` → `{ message: "Welcome to Sweet Feet API" }`
 
+Demo logins (password `SweetFeet123!`):
+
+| Role | Email |
+|------|--------|
+| Customer | `customer@sweetfeet.demo` |
+| Retailer | `lagoskicks@sweetfeet.demo` |
+| Retailer | `abuja.style@sweetfeet.demo` |
+| Admin | `admin@sweetfeet.demo` |
+
+Seed is **blocked on Render** so it cannot overwrite Atlas.
+
 ## Link to frontend
 
-The frontend uses `js/api.js`:
+Live Vercel keeps using Render. To try the shop against **your** database,
+open the shop once and in the browser console:
 
 ```js
-API_BASE = "http://localhost:5000/api/v1"
-window.SF_API_BASE = "https://YOUR-BACKEND-HOST/api/v1"
-window.SF_WS_URL = "wss://YOUR-BACKEND-HOST/ws/chat"
+localStorage.setItem("sf_api_base", "http://localhost:5000/api/v1");
+location.reload();
 ```
 
-CORS is controlled by `CORS_ORIGINS` in `.env` (comma-separated, no trailing slash).
+To go back to the live API:
+
+```js
+localStorage.removeItem("sf_api_base");
+location.reload();
+```
+
+`window.SF_API_BASE` still overrides everything if you set it.
 
 ## Chat protocol (`/ws/chat`)
 
@@ -80,6 +106,9 @@ REST `/api/v1/messages` is still used to load history.
 | `npm run dev` | Compile + watch + run |
 | `npm run build` | `tsc` → `dist/` |
 | `npm start` | Run `dist/server.js` (production) |
+| `npm run db:up` | Start local Mongo (Docker) |
+| `npm run db:down` | Stop local Mongo |
+| `npm run seed` | Load demo catalogue into **local** Mongo |
 
 ## Security notes
 
