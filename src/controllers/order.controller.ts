@@ -62,6 +62,10 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     status: OrderStatus.pending,
   });
 
+  const callbackUrl =
+    (typeof req.body.callbackUrl === "string" && req.body.callbackUrl.trim()) ||
+    "https://sweet-feet.vercel.app/nav/track.html";
+
   try {
     const paystackRes = await axios.post(
       "https://api.paystack.co/transaction/initialize",
@@ -69,7 +73,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
         email: email || req.user?.email,
         amount: Math.round(total * 100),
         metadata: { orderId: order._id.toString() },
-        callback_url: req.body.callbackUrl,
+        callback_url: callbackUrl,
       },
       { headers: { Authorization: `Bearer ${secret}` } }
     );
@@ -81,6 +85,11 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       data: { order, authorization_url, reference },
     });
   } catch (err: any) {
+    try {
+      await Order.findByIdAndDelete(order._id);
+    } catch {
+      /* ignore */
+    }
     return next(new AppError(`Paystack error: ${err.response?.data?.message || err.message}`, 502));
   }
 };
