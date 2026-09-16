@@ -100,6 +100,31 @@ export const protectRetailer = async (req: Request, _res: Response, next: NextFu
   next();
 };
 
+/** Logged-in retailer, including pending / suspended — for profile view/edit. */
+export const protectRetailerSession = async (req: Request, _res: Response, next: NextFunction) => {
+  const token = extractToken(req);
+  if (!token) return next(new AppError("Retailer login required", 401));
+
+  const decoded = jwt.verify(token, JWT_SECRET as string) as jwt.JwtPayload;
+  if (decoded.type !== "retailer") {
+    return next(new AppError("Retailer access only", 403));
+  }
+
+  const retailer = await Retailer.findById(decoded.id);
+  if (!retailer) return next(new AppError("Retailer no longer exists", 401));
+  if (retailer.changedPasswordAfter(decoded.iat ?? 0)) {
+    return next(new AppError("Password recently changed. Please log in again.", 401));
+  }
+
+  req.retailer = {
+    id: retailer._id,
+    email: retailer.email,
+    businessName: retailer.businessName,
+    status: retailer.status,
+  };
+  next();
+};
+
 export const restrictTo =
   (...roles: string[]) =>
   (req: Request, _res: Response, next: NextFunction) => {

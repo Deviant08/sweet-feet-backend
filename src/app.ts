@@ -80,7 +80,7 @@ const limiter = rateLimit({
 });
 app.use("/api", mw(limiter));
 
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use(mw(cookieParser()));
 app.use(mw(mongoSanitize()));
 app.use(mw(xss()));

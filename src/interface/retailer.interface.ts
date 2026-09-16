@@ -16,6 +16,7 @@ export interface RetailerProps {
   passwordConfirm?: string;
   status: RetailerStatus;
   commission: number;
+  lastProfileEditAt?: Date;
   passwordChangedAt?: Date;
   passwordResetToken?: string;
   passwordResetTokenExpires?: Date;

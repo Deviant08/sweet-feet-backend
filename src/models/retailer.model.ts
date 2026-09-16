@@ -26,8 +26,8 @@ const retailerSchema = new Schema<RetailerProps, RetailerModel, RetailerMethods>
     },
     phone: { type: String, trim: true },
     location: { type: String, trim: true },
-    logo: { type: String },
-    bio: { type: String },
+    logo: { type: String, maxlength: [800000, "Profile photo is too large"] },
+    bio: { type: String, maxlength: [600, "Bio cannot exceed 600 characters"] },
     password: {
       type: String,
       minlength: 6,
@@ -51,6 +51,7 @@ const retailerSchema = new Schema<RetailerProps, RetailerModel, RetailerMethods>
       default: RetailerStatus.pending,
     },
     commission: { type: Number, default: 5 },
+    lastProfileEditAt: Date,
     passwordChangedAt: Date,
     passwordResetToken: String,
     passwordResetTokenExpires: Date,
