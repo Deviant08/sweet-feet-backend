@@ -15,6 +15,13 @@ function paystackSecret(): string {
   return String(process.env.PAYSTACK_SECRET_KEY || "").trim();
 }
 
+function isHouseItem(item: any): boolean {
+  if (item?.isHouse) return true;
+  const product = item?.product;
+  if (product && typeof product === "object" && product.isHouse) return true;
+  return !asId(item?.retailer);
+}
+
 export const createOrder = async (req: Request, res: Response, next: NextFunction) => {
   const secret = paystackSecret();
   if (!secret) {
@@ -43,8 +50,10 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     const unitPrice = product.price;
     const subtotal = unitPrice * qty;
     total += subtotal;
+    const house = !!product.isHouse;
     orderItems.push({
-      retailer: product.retailer,
+      retailer: house ? undefined : product.retailer,
+      isHouse: house,
       product: product._id,
       productName: product.name,
       size: item.size,
@@ -148,6 +157,20 @@ export const getRetailerOrders = async (req: Request, res: Response) => {
   res.status(200).json({ status: "Success", results: data.length, data });
 };
 
+export const getHouseOrders = async (_req: Request, res: Response) => {
+  const orders = await Order.find({
+    $or: [{ "items.isHouse": true }, { "items.retailer": { $exists: false } }, { "items.retailer": null }],
+  }).sort({ orderedAt: -1 });
+  const data = orders
+    .map((order) => {
+      const json = order.toJSON();
+      json.items = (json.items || []).filter((it: any) => isHouseItem(it));
+      return json;
+    })
+    .filter((o: any) => Array.isArray(o.items) && o.items.length > 0);
+  res.status(200).json({ status: "Success", results: data.length, data });
+};
+
 export const updateItemStatus = async (req: Request, res: Response, next: NextFunction) => {
   const { orderId, itemId, status, note } = req.body;
   if (!orderId || !itemId || !status) {
@@ -169,6 +192,35 @@ export const updateItemStatus = async (req: Request, res: Response, next: NextFu
   const loggedInRetailerId = asId(req.retailer!.id);
   if (!itemRetailerId || itemRetailerId !== loggedInRetailerId) {
     return next(new AppError("You do not own this order item", 403));
+  }
+
+  item.status = status;
+  if (typeof note === "string" && note.trim()) {
+    item.note = note.trim();
+  }
+  await order.save();
+
+  res.status(200).json({ status: "Success", data: order });
+};
+
+export const updateHouseItemStatus = async (req: Request, res: Response, next: NextFunction) => {
+  const { orderId, itemId, status, note } = req.body;
+  if (!orderId || !itemId || !status) {
+    return next(new AppError("orderId, itemId and status are required", 400));
+  }
+  if (!Object.values(ItemStatus).includes(status)) {
+    return next(new AppError("Invalid status", 400));
+  }
+
+  const order = await Order.findById(orderId);
+  if (!order) return next(new AppError("Order not found", 404));
+
+  const item =
+    (order.items as any).id?.(itemId) ||
+    (order.items as any).find((it: any) => asId(it._id) === String(itemId));
+  if (!item) return next(new AppError("Order item not found", 404));
+  if (!isHouseItem(item)) {
+    return next(new AppError("This item is not a Sweet Feet official product", 403));
   }
 
   item.status = status;

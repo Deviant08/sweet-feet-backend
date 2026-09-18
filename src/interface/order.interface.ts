@@ -16,7 +16,8 @@ export enum ItemStatus {
 }
 
 export interface OrderItemProps {
-  retailer: Types.ObjectId;
+  retailer?: Types.ObjectId;
+  isHouse?: boolean;
   product?: Types.ObjectId;
   productName: string;
   size?: string;

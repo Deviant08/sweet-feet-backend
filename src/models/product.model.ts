@@ -9,8 +9,10 @@ const productSchema = new Schema<ProductProps, ProductModel>(
     retailer: {
       type: SchemaTypes.ObjectId,
       ref: "Retailer",
-      required: [true, "Product must belong to a retailer"],
+      required: false,
     },
+    isHouse: { type: Boolean, default: false, index: true },
+    houseKey: { type: String, trim: true, unique: true, sparse: true },
     name: {
       type: String,
       trim: true,
@@ -50,6 +52,9 @@ const productSchema = new Schema<ProductProps, ProductModel>(
 productSchema.pre("save", function (next) {
   if (this.isModified("name")) {
     this.slug = slugify(this.name, { lower: true, replacement: "-" });
+  }
+  if (this.isHouse) {
+    this.retailer = undefined;
   }
   next();
 });

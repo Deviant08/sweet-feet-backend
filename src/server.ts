@@ -4,6 +4,7 @@ import app from "./app";
 import mongoose from "mongoose";
 import { attachChatSocket } from "./chat/chat.gateway";
 import { ensureAdmin } from "./utils/ensureAdmin";
+import { ensureHouseCatalog } from "./utils/ensureHouseCatalog";
 
 mongoose.set("strictQuery", false);
 
@@ -65,6 +66,7 @@ const start = async () => {
   try {
     await dbConnect();
     await ensureAdmin();
+    await ensureHouseCatalog();
   } catch (err: any) {
     console.error("Startup failed:", err?.name, err?.message);
     process.exit(1);

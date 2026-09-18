@@ -3,7 +3,8 @@ import { OrderProps, OrderStatus, ItemStatus } from "../interface/order.interfac
 
 const orderItemSchema = new Schema(
   {
-    retailer: { type: SchemaTypes.ObjectId, ref: "Retailer", required: true },
+    retailer: { type: SchemaTypes.ObjectId, ref: "Retailer", required: false },
+    isHouse: { type: Boolean, default: false },
     product: { type: SchemaTypes.ObjectId, ref: "Product" },
     productName: { type: String, required: true },
     size: String,
@@ -40,7 +41,7 @@ orderSchema.pre(/^find/, function (next) {
   (this as any)
     .populate({ path: "user", select: "fullName email phone" })
     .populate({ path: "items.retailer", select: "businessName email phone location" })
-    .populate({ path: "items.product", select: "name img price slug" });
+    .populate({ path: "items.product", select: "name img price slug isHouse" });
   next();
 });
 

@@ -1,7 +1,9 @@
 import { Types } from "mongoose";
 
 export interface ProductProps {
-  retailer: Types.ObjectId;
+  retailer?: Types.ObjectId;
+  isHouse?: boolean;
+  houseKey?: string;
   name: string;
   slug?: string;
   category?: string;
