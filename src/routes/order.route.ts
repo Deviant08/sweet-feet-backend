@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { catchAsync } from "../middlewares/catchAsyncError.middleware";
-import { protect, protectRetailer, restrictTo } from "../middlewares/auth.middleware";
+import { protect, protectRetailer, restrictTo, optionalProtect } from "../middlewares/auth.middleware";
 import {
   createOrder,
   verifyPayment,
@@ -14,7 +14,7 @@ import {
 
 const orderRouter = Router();
 
-orderRouter.post("/", protect, catchAsync(createOrder));
+orderRouter.post("/", optionalProtect, catchAsync(createOrder));
 orderRouter.post("/verify", catchAsync(verifyPayment));
 orderRouter.get("/verify", catchAsync(verifyPayment));
 orderRouter.get("/mine", protect, catchAsync(getMyOrders));

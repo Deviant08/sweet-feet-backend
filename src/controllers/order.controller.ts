@@ -38,6 +38,11 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     return next(new AppError("Order items are required", 400));
   }
 
+  const payEmail = String(email || req.user?.email || "").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payEmail)) {
+    return next(new AppError("A valid email is required to checkout", 400));
+  }
+
   const orderItems = [];
   let total = 0;
 
@@ -79,7 +84,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     const paystackRes = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
-        email: email || req.user?.email,
+        email: payEmail,
         amount: Math.round(total * 100),
         metadata: { orderId: order._id.toString() },
         callback_url: callbackUrl,

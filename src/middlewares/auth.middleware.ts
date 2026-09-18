@@ -76,6 +76,20 @@ export const protect = async (req: Request, _res: Response, next: NextFunction) 
   next();
 };
 
+/** Attach user/retailer when a token is present; otherwise continue as guest. */
+export const optionalProtect = async (req: Request, _res: Response, next: NextFunction) => {
+  const token = extractToken(req);
+  if (!token) return next();
+  try {
+    await protect(req, _res, (err?: any) => {
+      if (err) return next();
+      next();
+    });
+  } catch {
+    next();
+  }
+};
+
 export const protectRetailer = async (req: Request, _res: Response, next: NextFunction) => {
   const token = extractToken(req);
   if (!token) return next(new AppError("Retailer login required", 401));
